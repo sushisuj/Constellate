@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node
+node_modules/
+dist/
+.env.local
+
+# Data / stores (generated, not committed)
+services/graph/data/
+services/retrieval/chroma/
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+
+# Stale — no longer written by anything
+data/

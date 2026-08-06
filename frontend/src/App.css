@@ -1,0 +1,129 @@
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+header .word {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin: 10px 0 48px 44px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chat {
+  padding: 28px;
+  border-right: 1px solid var(--border);
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .chat {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.msg {
+  max-width: 80%;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.msg.user {
+  margin-left: auto;
+  background: var(--surface-2);
+  border-radius: 12px 12px 2px 12px;
+  padding: 10px 14px;
+}
+
+.msg.assistant {
+  padding: 2px 0 0;
+}
+
+.cites {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cite {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--gold-dim);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.inputbar {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.graph {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.graph .label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.graph svg {
+  width: 100%;
+  height: auto;
+}
+
+.node-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  fill: var(--text-secondary);
+}
+
+.node-name.active {
+  fill: var(--gold);
+}
+
+.status-note {
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: left;
+}

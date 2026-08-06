@@ -1,0 +1,39 @@
+:root {
+  --bg: #06080f;
+  --surface: #0e1424;
+  --surface-2: #151c33;
+  --border: #232b45;
+  --text-primary: #e7e9f2;
+  --text-secondary: #9099b5;
+  --text-muted: #5d6580;
+  --gold: #e8b84b;
+  --gold-dim: #a9822f;
+  --star-dim: #4a5170;
+
+  color-scheme: dark;
+  color: var(--text-primary);
+  background: var(--bg);
+  font-family: 'Inter', sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(232, 184, 74, 0.06), transparent 60%),
+    var(--bg);
+  min-height: 100svh;
+}
+
+#root {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 64px 24px 96px;
+}
