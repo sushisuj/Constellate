@@ -15,7 +15,67 @@ header .word {
 .tagline {
   color: var(--text-secondary);
   font-size: 15px;
-  margin: 10px 0 48px 44px;
+  margin: 10px 0 28px 44px;
+}
+
+.uploads-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 20px 44px;
+}
+
+.upload-btn {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.upload-btn:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.uploads-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.uploads-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.upload-chip {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.error-banner {
+  margin: 0 0 20px 44px;
+  font-size: 13px;
+  color: #e08a8a;
+  background: rgba(224, 138, 138, 0.08);
+  border: 1px solid rgba(224, 138, 138, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
 
 .card {
@@ -64,6 +124,23 @@ header .word {
   padding: 2px 0 0;
 }
 
+.msg.assistant.thinking {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.stub-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chat-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
 .cites {
   display: flex;
   gap: 6px;
@@ -83,12 +160,42 @@ header .word {
 
 .inputbar {
   margin-top: 24px;
+  display: flex;
+  gap: 8px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 6px 6px 6px 12px;
+}
+
+.inputbar input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: inherit;
   font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.inputbar input::placeholder {
   color: var(--text-muted);
+}
+
+.inputbar button {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--bg);
+  background: var(--gold);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.inputbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .graph {
@@ -98,12 +205,45 @@ header .word {
   text-align: left;
 }
 
+.graph .label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
 .graph .label {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 12px;
+}
+
+.shuffle-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.shuffle-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.constellation-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--gold-dim);
+  margin-bottom: 8px;
 }
 
 .graph svg {
@@ -119,11 +259,4 @@ header .word {
 
 .node-name.active {
   fill: var(--gold);
-}
-
-.status-note {
-  margin-top: 20px;
-  font-size: 12px;
-  color: var(--text-muted);
-  text-align: left;
 }

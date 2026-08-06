@@ -11,6 +11,7 @@ introduced.
 import threading
 
 from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from .assistant import Assistant
 from .extract import UnsupportedFileType, extract_text
@@ -19,7 +20,18 @@ from .schemas import AskRequest, AskResponse, UploadResponse
 MAX_QUESTION_CHARS = 500
 MAX_UPLOAD_BYTES = 5_000_000
 
+# Vite's dev server, both hostnames it might bind to. This is a local-dev
+# allowlist, not a production one -- tighten before this ever leaves a
+# laptop.
+DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
 app = FastAPI(title="Constellate orchestrator")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=DEV_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 assistant = Assistant()
 lock = threading.Lock()
 

@@ -25,6 +25,21 @@ from .chunker import chunk_text, humanize_filename
 from .memory import Memory
 from .retriever import Retriever
 from .store import build_index
+from .textutil import content_words
+
+# How many distinct keywords to hand back per upload for the frontend's
+# decorative constellation labels (see GraphPanel in App.jsx) -- plenty for
+# a handful of random picks per redraw without the response getting large.
+MAX_KEYWORDS = 60
+
+
+def _extract_keywords(chunks):
+    words = set()
+    for chunk in chunks:
+        for word in content_words(chunk.text):
+            if word.isalpha() and len(word) >= 4:
+                words.add(word)
+    return list(words)[:MAX_KEYWORDS]
 
 
 @dataclass
@@ -42,9 +57,15 @@ class UploadedDoc:
     topics: list
     retriever: object             # Retriever -- internal, never serialized
     tmpdir: object                 # TemporaryDirectory -- kept alive as long as this is
+    keywords: list = field(default_factory=list)  # for the frontend's decorative labels only
 
     def summary(self):
-        return {"filename": self.filename, "chunks": self.chunks, "topics": self.topics}
+        return {
+            "filename": self.filename,
+            "chunks": self.chunks,
+            "topics": self.topics,
+            "keywords": self.keywords,
+        }
 
 
 REFUSAL = (
@@ -75,7 +96,15 @@ class Assistant:
 
         retriever = Retriever(chroma_dir, collection_name)
         topics = sorted({c.topic_label for c in chunks})
-        doc = UploadedDoc(filename=filename, chunks=len(chunks), topics=topics, retriever=retriever, tmpdir=tmpdir)
+        keywords = _extract_keywords(chunks)
+        doc = UploadedDoc(
+            filename=filename,
+            chunks=len(chunks),
+            topics=topics,
+            retriever=retriever,
+            tmpdir=tmpdir,
+            keywords=keywords,
+        )
         self._uploads.append(doc)
         return doc.summary()
 

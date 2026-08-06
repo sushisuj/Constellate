@@ -18,3 +18,4 @@ class UploadResponse(BaseModel):
     filename: str
     chunks: int
     topics: list[str]
+    keywords: list[str] = Field(default_factory=list)

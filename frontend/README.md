@@ -1,16 +1,28 @@
-# React + Vite
+# Constellate frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Vite chat UI for `services/orchestrator`. Upload a document, ask
+questions about it, see cited answers.
 
-Currently, two official plugins are available:
+`src/api.js` is the only place that talks to the backend — `uploadFile()`,
+`askQuestion()`, `listUploads()`, all thin `fetch` wrappers around the
+orchestrator's routes. Points at `VITE_API_BASE`, or
+`http://127.0.0.1:8001` if that's unset.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+`src/App.jsx` holds all UI state (uploads, messages, in-flight
+upload/ask). The "Connections used" graph panel is static decoration, not
+wired to real data — see the root README's "What changed" section for why
+(short version: there's no knowledge graph behind it anymore).
 
-## React Compiler
+## Running locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+cp .env.example .env   # optional, only needed if the backend isn't on
+                        # 127.0.0.1:8001
+npm run dev
+```
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The orchestrator needs to be running too (`services/orchestrator`, port
+8001) — CORS is configured there for `localhost:5173`, Vite's default dev
+port. If you run the frontend on a different port, add it to
+`DEV_ORIGINS` in `services/orchestrator/app/main.py`.
