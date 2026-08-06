@@ -27,10 +27,13 @@ Two pieces:
   when the design was graph-based; see its README for why that split no
   longer applies).
 - **`frontend`** — React chat UI (Vite). Wired to the orchestrator: upload
-  a document, ask a question, see the real answer and citations. The
-  "Connections used" graph panel is kept as static decoration, not wired
-  to anything — a leftover of the dropped knowledge-graph direction that
-  still looks good on the brand.
+  a document, remove or clear uploads, ask a question, see the answer
+  with citations and near-miss "related" sections. The "Connections used"
+  graph panel is real constellations (Orion, Ursa Major, and others),
+  picked and redrawn at random purely for brand decoration — no document
+  data behind the shape itself, though the small gold labels on a few
+  stars are drawn from the uploaded documents' own vocabulary once
+  there's something to draw from.
 
 LLM backend is NVIDIA's hosted NIM models (free tier, `build.nvidia.com`),
 model `meta/llama-3.1-8b-instruct` — see
@@ -41,10 +44,16 @@ model `meta/llama-3.1-8b-instruct` — see
 `services/orchestrator` is implemented and verified as far as this
 environment allows (see its own README's Status section) — not yet
 confirmed against the real NVIDIA/Chroma endpoints on an actual machine.
-`frontend` now calls it directly (upload, ask, list uploads) — the JS
-builds cleanly and the API calls were traced by hand against the backend's
-routes, but the two haven't been run against each other on a real machine
-yet either. That's the next thing to confirm.
+`frontend` now calls it directly (upload, remove, clear, ask, list
+uploads) — the JS builds cleanly and the API calls were traced by hand
+against the backend's routes, but the two haven't been run against each
+other on a real machine yet either. That's the next thing to confirm.
+
+Uploads now persist across a backend restart (`data/uploads/`, gitignored
+— see `services/orchestrator/README.md`'s "What changed" section). The
+reload-on-restart path was verified with a stubbed-out Chroma so the file
+logic itself is exercised end to end, but not yet with the real
+dependency stack on an actual machine.
 
 ## Running locally
 

@@ -8,6 +8,7 @@ see retriever.py's module docstring for why there's no gate to calibrate.
 """
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -57,3 +58,10 @@ LLM_MAX_TOKENS = 2048
 # How many top-ranked chunks (merged across every uploaded document) are
 # handed to the LLM as context.
 GENERATION_TOP_K = 3
+
+# --- Storage ----------------------------------------------------------------
+# Each upload gets its own subdirectory here (a Chroma collection plus a
+# small meta.json) so documents survive a server restart. Previously these
+# lived in a tempfile.TemporaryDirectory() that vanished the moment the
+# process exited -- fine for a quick demo, not for actually using this.
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "data" / "uploads"

@@ -7,16 +7,22 @@ extras, not "document search and explain"). What's kept: retrieval merged
 across every uploaded document, memory-aware follow-up handling, and
 handing the winning candidates to an LLM to compose a cited answer.
 
-Every uploaded document gets its own ephemeral Chroma collection in its
-own temp directory (see upload_document) -- same pattern as Chatbot's
-Assistant.upload_document(), and for the same reason: no persistent
-cross-session store means no risk of one conversation's uploads leaking
-into another's answers. This mirrors Chatbot's actual scope (a single
-shared instance per running process, not real multi-tenancy) rather than
-attempting to solve session isolation as part of this port.
+Every uploaded document gets its own Chroma collection in its own
+directory under config.UPLOADS_DIR (see upload_document), one per
+document rather than one shared collection -- so there's no risk of one
+conversation's uploads leaking into another's answers. Unlike the
+temp-directory version this replaced, these directories are persistent:
+a small meta.json sits alongside each collection, and __init__ reloads
+whatever's there on startup, so uploads survive a server restart. This
+still mirrors Chatbot's actual scope (a single shared instance per
+running process, not real multi-tenancy) rather than attempting to solve
+session isolation as part of this port -- persistence and multi-tenancy
+are separate problems, and only the first one is addressed here.
 """
 
-import tempfile
+import json
+import shutil
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -56,10 +62,13 @@ class UploadedDoc:
     chunks: int
     topics: list
     retriever: object             # Retriever -- internal, never serialized
-    tmpdir: object                 # TemporaryDirectory -- kept alive as long as this is
+    doc_dir: Path                  # holds chroma/ and meta.json; deleted on remove/clear
     keywords: list = field(default_factory=list)  # for the frontend's decorative labels only
 
     def summary(self):
+        # Also what gets written to meta.json -- upload_document() dumps
+        # this straight to disk so _load_persisted_uploads() can rebuild
+        # everything but the retriever from it on the next startup.
         return {
             "filename": self.filename,
             "chunks": self.chunks,
@@ -78,19 +87,53 @@ class Assistant:
     def __init__(self):
         self.memory = Memory()
         self._uploads = []
+        self._load_persisted_uploads()
 
     # -- uploads --------------------------------------------------------
 
+    def _load_persisted_uploads(self):
+        """Rebuild self._uploads from whatever's on disk under
+        config.UPLOADS_DIR -- each subdirectory is one earlier upload's
+        chroma/ collection plus the meta.json upload_document() wrote for
+        it. Only the Retriever gets reconstructed; nothing gets
+        re-chunked or re-embedded.
+        """
+        if not config.UPLOADS_DIR.exists():
+            return
+        for doc_dir in sorted(config.UPLOADS_DIR.iterdir()):
+            meta_path = doc_dir / "meta.json"
+            if not meta_path.exists():
+                continue
+            try:
+                meta = json.loads(meta_path.read_text())
+                retriever = Retriever(doc_dir / "chroma", "doc")
+            except Exception:
+                # Partial/corrupt directory, e.g. the process died mid-
+                # write -- skip it rather than fail the whole service.
+                continue
+            self._uploads.append(
+                UploadedDoc(
+                    filename=meta["filename"],
+                    chunks=meta["chunks"],
+                    topics=meta["topics"],
+                    retriever=retriever,
+                    doc_dir=doc_dir,
+                    keywords=meta.get("keywords", []),
+                )
+            )
+
     def upload_document(self, text, filename):
-        """Index one uploaded document into its own ephemeral collection.
-        Added to the list of uploads rather than replacing any already
-        there, so multiple documents accumulate across a conversation.
+        """Index one uploaded document into its own persistent collection
+        under config.UPLOADS_DIR. Added to the list of uploads rather than
+        replacing any already there, so multiple documents accumulate
+        across a conversation.
         """
         title = humanize_filename(Path(filename))
         chunks = chunk_text(text, title)
 
-        tmpdir = tempfile.TemporaryDirectory()
-        chroma_dir = Path(tmpdir.name) / "chroma"
+        doc_dir = config.UPLOADS_DIR / uuid.uuid4().hex[:12]
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        chroma_dir = doc_dir / "chroma"
         collection_name = "doc"
         build_index(chunks, chroma_dir, collection_name, source_label=title)
 
@@ -102,9 +145,10 @@ class Assistant:
             chunks=len(chunks),
             topics=topics,
             retriever=retriever,
-            tmpdir=tmpdir,
+            doc_dir=doc_dir,
             keywords=keywords,
         )
+        (doc_dir / "meta.json").write_text(json.dumps(doc.summary()))
         self._uploads.append(doc)
         return doc.summary()
 
@@ -114,11 +158,14 @@ class Assistant:
     def remove_upload(self, filename):
         for i, doc in enumerate(self._uploads):
             if doc.filename == filename:
+                shutil.rmtree(doc.doc_dir, ignore_errors=True)
                 del self._uploads[i]
                 return True
         return False
 
     def clear_uploads(self):
+        for doc in self._uploads:
+            shutil.rmtree(doc.doc_dir, ignore_errors=True)
         self._uploads = []
 
     # -- pipeline ---------------------------------------------------------

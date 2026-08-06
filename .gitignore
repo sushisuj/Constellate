@@ -10,13 +10,13 @@ dist/
 .env.local
 
 # Data / stores (generated, not committed)
-services/graph/data/
-services/retrieval/chroma/
 *.db
 *.sqlite3
 
 # OS
 .DS_Store
 
-# Stale — no longer written by anything
+# Per-upload Chroma collections + meta.json, written by
+# services/orchestrator/app/assistant.py so uploads survive a restart.
+# Real user data, not source -- never commit it.
 data/

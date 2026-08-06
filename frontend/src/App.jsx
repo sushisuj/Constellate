@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { askQuestion, listUploads, uploadFile } from './api.js'
+import { askQuestion, clearUploads, listUploads, removeUpload, uploadFile } from './api.js'
 
 const GRAPH_W = 240
 const GRAPH_H = 220
@@ -350,6 +350,26 @@ function App() {
     }
   }
 
+  async function handleRemoveUpload(filename) {
+    setError(null)
+    try {
+      await removeUpload(filename)
+      setUploads((prev) => prev.filter((doc) => doc.filename !== filename))
+    } catch (err) {
+      setError(`Remove failed: ${err.message}`)
+    }
+  }
+
+  async function handleClearUploads() {
+    setError(null)
+    try {
+      await clearUploads()
+      setUploads([])
+    } catch (err) {
+      setError(`Clear failed: ${err.message}`)
+    }
+  }
+
   async function handleAsk(event) {
     event.preventDefault()
     const trimmed = question.trim()
@@ -409,10 +429,24 @@ function App() {
             uploads.map((doc) => (
               <span className="upload-chip" key={doc.filename}>
                 {doc.filename} · {doc.chunks} chunks
+                <button
+                  type="button"
+                  className="chip-remove"
+                  onClick={() => handleRemoveUpload(doc.filename)}
+                  aria-label={`Remove ${doc.filename}`}
+                  title="Remove"
+                >
+                  ×
+                </button>
               </span>
             ))
           )}
         </div>
+        {uploads.length > 0 && (
+          <button type="button" className="clear-btn" onClick={handleClearUploads}>
+            Clear all
+          </button>
+        )}
       </div>
 
       {error && <div className="error-banner">{error}</div>}
@@ -441,6 +475,11 @@ function App() {
                         {s.source} · {s.citation}
                       </span>
                     ))}
+                  </div>
+                )}
+                {msg.related?.length > 0 && (
+                  <div className="related">
+                    Related: {msg.related.join(' · ')}
                   </div>
                 )}
               </div>

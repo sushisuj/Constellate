@@ -45,3 +45,16 @@ export async function listUploads() {
   const response = await fetch(`${API_BASE}/uploads`)
   return unwrap(response)
 }
+
+export async function removeUpload(filename) {
+  const query = new URLSearchParams({ filename })
+  const response = await fetch(`${API_BASE}/uploads/remove?${query}`, {
+    method: 'POST',
+  })
+  return unwrap(response)
+}
+
+export async function clearUploads() {
+  const response = await fetch(`${API_BASE}/uploads/clear`, { method: 'POST' })
+  return unwrap(response)
+}

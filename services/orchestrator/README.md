@@ -8,7 +8,10 @@ separate `ingestion` service (chunking, vector store, knowledge-graph
 entity extraction) — see "What changed" below for why that split is gone.
 
 Upload a document (`POST /upload`), ask a question about whatever's been
-uploaded so far (`POST /ask`), get a cited, LLM-composed answer back. No
+uploaded so far (`POST /ask`), get a cited, LLM-composed answer back.
+Remove one upload (`POST /uploads/remove?filename=...`) or all of them
+(`POST /uploads/clear`); list what's currently loaded (`GET /uploads`);
+reset the follow-up memory without touching uploads (`POST /reset`). No
 scope gate, no verbatim-quote-only mode, no knowledge graph — see
 `app/retriever.py`'s module docstring for the scope-gate reasoning and
 `app/llm.py`'s for the model choice.
@@ -43,14 +46,25 @@ graph, that split maps to nothing real — Chatbot itself is one class
 (`Assistant`) doing uploads, retrieval, and generation together, and this
 mirrors that.
 
-**Uploads are ephemeral, not a shared persistent store.** The old
-`ingestion` service kept one Chroma collection shared across every
-document ever uploaded, from anyone — a real leak (one conversation's
-documents were retrievable from any other). Each upload here gets its own
-temp-directory Chroma collection instead, matching Chatbot's own
-`upload_document()` pattern. This is still a single-shared-`Assistant`-
-instance service, not real multi-tenancy — same scope Chatbot's own
-README names as its own limitation, not newly introduced here.
+**Each upload gets its own Chroma collection, and it's no longer
+ephemeral.** The old `ingestion` service kept one Chroma collection shared
+across every document ever uploaded, from anyone — a real leak (one
+conversation's documents were retrievable from any other). Each upload
+here still gets its own collection, but it now lives under
+`data/uploads/<id>/` instead of a `tempfile.TemporaryDirectory()` that
+vanished the moment the process exited — a small `meta.json` sits next to
+each collection, and `Assistant.__init__` reloads whatever's there on
+startup, so uploads survive a restart. This is still a
+single-shared-`Assistant`-instance service, not real multi-tenancy — same
+scope Chatbot's own README names as its own limitation, not newly
+introduced here. Persistence and multi-tenancy are separate problems;
+only the first one is solved.
+
+**CORS is wired for local dev.** The frontend runs on Vite's dev server
+(`localhost:5173`), a different origin than this API (`localhost:8001`),
+so `app/main.py` adds `CORSMiddleware` allowing that origin specifically.
+It's a hardcoded dev allowlist (`DEV_ORIGINS`), not meant to survive
+contact with a real deployment.
 
 ## Status
 
@@ -63,6 +77,17 @@ model's download call, which is where it hit this sandbox's network
 policy (same wall `services/ingestion` hit before it was confirmed working
 against the real NVIDIA/Chroma endpoints on an actual machine). Not yet
 confirmed end-to-end for real — that's the next thing to do.
+
+The persistence path (upload → restart → reload, plus remove/clear
+deleting their directories) was verified separately, against a stubbed-out
+Chroma standing in for the real one — this sandbox couldn't get the real
+`chromadb` package's full dependency chain (it pulls in OpenTelemetry's
+gRPC exporter, which needs a C extension this environment couldn't build)
+installed to test it directly. The file-handling logic itself — writing
+and reading `meta.json`, reconstructing `UploadedDoc`s, deleting
+directories on remove/clear — is exercised end to end by that test; what's
+still unconfirmed is that exact same logic running against the real
+Chroma on an actual machine.
 
 ## Running locally
 
