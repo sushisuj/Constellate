@@ -16,6 +16,10 @@ dist/
 # OS
 .DS_Store
 
+# Sphinx build output (docs/ source is committed, build artifacts aren't --
+# ReadTheDocs builds its own copy from source)
+docs/_build/
+
 # Per-upload Chroma collections + meta.json, written by
 # services/orchestrator/app/assistant.py so uploads survive a restart.
 # Real user data, not source -- never commit it.
