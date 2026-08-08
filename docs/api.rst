@@ -17,7 +17,10 @@ Ask Endpoint
 --------------
 
 .. todo::
-   POST /ask -- same per-endpoint shape as above.
+   POST /ask -- same per-endpoint shape as above. Cover the flags field
+   (``blocked_injection``, ``low_groundedness``, ``unsafe_word:<word>``,
+   etc.) and how a blocked question short-circuits before retrieval/
+   generation -- see guardrails.py.
 
 Session Endpoints
 --------------------

@@ -26,7 +26,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, llm
+from . import config, guardrails, llm
 from .chunker import chunk_text, humanize_filename
 from .memory import Memory
 from .retriever import Retriever
@@ -54,6 +54,7 @@ class Reply:
     sources: list = field(default_factory=list)   # [{"source", "citation"}, ...]
     related: list = field(default_factory=list)   # citations of near-miss chunks
     backend: str = ""            # "llm" or "stub" -- see llm.py
+    flags: list = field(default_factory=list)      # guardrail results -- see guardrails.py
 
 
 @dataclass
@@ -176,8 +177,25 @@ class Assistant:
         retriever.py's module docstring -- so this always attempts an
         answer once at least one document is uploaded; grounding is
         enforced by the prompt instruction in llm.py, not a pre-generation
-        threshold.
+        threshold (and re-checked afterwards, heuristically -- see below).
+
+        Runs guardrails.check_injection() first, before retrieval or
+        generation, on every question regardless of upload state -- a
+        blocked question shouldn't cost an API call, or even a vector
+        search.
         """
+        blocked = guardrails.check_injection(question)
+        if blocked:
+            return Reply(
+                message=(
+                    "That question reads like an attempt to change my "
+                    "instructions rather than ask about a document, so I'm "
+                    "not going to answer it as asked. Rephrase it as a "
+                    "question about what's been uploaded."
+                ),
+                flags=["blocked_injection"],
+            )
+
         if not self._uploads:
             return Reply(message=REFUSAL)
 
@@ -195,6 +213,17 @@ class Assistant:
         top_candidates = candidates[: config.GENERATION_TOP_K]
         top_chunks = [c.chunk for c in top_candidates]
         answer, backend = llm.generate(question, top_chunks)
+
+        # Output-side guardrails -- see guardrails.py for what each of
+        # these actually checks and why it's rule-based rather than a
+        # second LLM call. Format enforcement can rewrite the answer
+        # (stripping stray markdown); the other two only ever add flags,
+        # never change what's returned.
+        answer, format_flags = guardrails.enforce_format(answer)
+        flags = list(format_flags)
+        if guardrails.score_groundedness(answer, top_chunks) < guardrails.LOW_GROUNDEDNESS_THRESHOLD:
+            flags.append("low_groundedness")
+        flags.extend(f"unsafe_word:{w}" for w in guardrails.check_content_safety(answer))
 
         best = top_candidates[0]
         self.memory.record(question, best.chunk.topic, best.chunk.section)
@@ -218,6 +247,7 @@ class Assistant:
             sources=[{"source": c.source, "citation": c.citation} for c in top_chunks],
             related=related,
             backend=backend,
+            flags=flags,
         )
 
     # -- session controls ---------------------------------------------------

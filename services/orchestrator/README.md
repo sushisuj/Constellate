@@ -60,6 +60,24 @@ scope Chatbot's own README names as its own limitation, not newly
 introduced here. Persistence and multi-tenancy are separate problems;
 only the first one is solved.
 
+**Guardrails, added after the initial port.** `app/guardrails.py` runs
+input-side and output-side checks around every `/ask` call, all
+rule-based rather than a second LLM call — this app already fought one
+latency battle over reasoning-model overhead (see the model-choice note
+above), and a guardrail that calls an LLM to judge the first LLM's answer
+would reintroduce exactly that cost per question. Four checks: injection/
+jailbreak pattern-matching on the question, which blocks outright before
+any retrieval or generation happens; a groundedness heuristic (lexical
+overlap between the answer and the chunks it's supposed to be grounded
+in, reusing `textutil.content_words`); a content-safety keyword scan
+(illustrative, not a real moderation system); and a format-compliance
+pass that strips stray markdown the prompt already told the model not to
+use. Results come back on `AskResponse.flags`. A complementary defense
+lives in `app/llm.py`'s prompt itself — an explicit instruction to treat
+retrieved context as data, never as instructions, which matters because
+context here is arbitrary uploaded document text that could contain
+injected instructions of its own.
+
 **CORS is wired for local dev.** The frontend runs on Vite's dev server
 (`localhost:5173`), a different origin than this API (`localhost:8001`),
 so `app/main.py` adds `CORSMiddleware` allowing that origin specifically.
@@ -88,6 +106,16 @@ and reading `meta.json`, reconstructing `UploadedDoc`s, deleting
 directories on remove/clear — is exercised end to end by that test; what's
 still unconfirmed is that exact same logic running against the real
 Chroma on an actual machine.
+
+Guardrails were checked directly against `guardrails.py`'s functions
+(injection patterns against both attack phrasings and legitimate
+questions that share surface words with them, like "act as a lawyer and
+explain this clause" correctly *not* blocking; groundedness scoring
+against a grounded vs. an unrelated answer; format stripping against a
+markdown-heavy sample) and through `Assistant.ask()` end to end against
+the same stubbed-Chroma setup used for the persistence check. All passed,
+including confirming a blocked question never reaches retrieval or
+generation.
 
 ## Running locally
 

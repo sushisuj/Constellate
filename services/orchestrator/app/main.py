@@ -53,7 +53,13 @@ def ask(request: AskRequest):
             reply = assistant.ask(question)
         except Exception as exc:  # noqa: BLE001 -- surfaced as a 502, not a crash
             raise HTTPException(502, f"generation failed: {exc}") from exc
-    return AskResponse(message=reply.message, sources=reply.sources, related=reply.related, backend=reply.backend)
+    return AskResponse(
+        message=reply.message,
+        sources=reply.sources,
+        related=reply.related,
+        backend=reply.backend,
+        flags=reply.flags,
+    )
 
 
 @app.post("/upload", response_model=UploadResponse)

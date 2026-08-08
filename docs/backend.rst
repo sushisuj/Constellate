@@ -24,6 +24,15 @@ Retrieval and Ranking
    No scope gate -- why (see retriever.py's own docstring). Similarity +
    lexical overlap + topic-continuity scoring.
 
+Guardrails
+------------
+
+.. todo::
+   guardrails.py -- input injection blocking, output groundedness/
+   safety/format checks. Why rule-based, not a second LLM call. The
+   context-is-data-not-instructions prompt hardening in llm.py as the
+   complementary indirect-injection defense.
+
 Persistence
 -------------
 

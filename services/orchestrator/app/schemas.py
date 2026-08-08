@@ -12,6 +12,7 @@ class AskResponse(BaseModel):
     sources: list[dict] = Field(default_factory=list)
     related: list[str] = Field(default_factory=list)
     backend: str
+    flags: list[str] = Field(default_factory=list)
 
 
 class UploadResponse(BaseModel):

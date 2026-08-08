@@ -202,6 +202,12 @@ header .word {
   color: var(--text-muted);
 }
 
+.flag-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #e0b95a;
+}
+
 .inputbar {
   margin-top: 24px;
   display: flex;

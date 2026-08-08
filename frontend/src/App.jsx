@@ -300,6 +300,20 @@ function GraphPanel({ words }) {
   )
 }
 
+// Not every guardrail flag is worth surfacing -- stray_markdown_stripped
+// and possible_bracket_citation are silent housekeeping (see
+// guardrails.py), not something the user needs to act on. Returns null
+// for flags that shouldn't be shown.
+function describeFlag(flag) {
+  if (flag === 'low_groundedness') {
+    return "This answer may not be well supported by the source text — worth double-checking."
+  }
+  if (flag.startsWith('unsafe_word:')) {
+    return `Flagged word in this answer: "${flag.split(':')[1]}"`
+  }
+  return null
+}
+
 function App() {
   const [uploads, setUploads] = useState([])
   const [messages, setMessages] = useState([])
@@ -389,6 +403,7 @@ function App() {
           sources: reply.sources,
           related: reply.related,
           backend: reply.backend,
+          flags: reply.flags,
         },
       ])
     } catch (err) {
@@ -482,6 +497,11 @@ function App() {
                     Related: {msg.related.join(' · ')}
                   </div>
                 )}
+                {msg.flags?.map(describeFlag).filter(Boolean).map((text, k) => (
+                  <div className="flag-note" key={k}>
+                    ⚠ {text}
+                  </div>
+                ))}
               </div>
             ))
           )}
