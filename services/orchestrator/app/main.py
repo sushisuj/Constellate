@@ -13,12 +13,20 @@ import threading
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import sentiment
 from .assistant import Assistant
 from .extract import UnsupportedFileType, extract_text
-from .schemas import AskRequest, AskResponse, UploadResponse
+from .schemas import (
+    AskRequest,
+    AskResponse,
+    SentimentRequest,
+    SentimentResponse,
+    UploadResponse,
+)
 
 MAX_QUESTION_CHARS = 500
 MAX_UPLOAD_BYTES = 5_000_000
+MAX_SENTIMENT_CHARS = 5_000
 
 # Vite's dev server, both hostnames it might bind to. This is a local-dev
 # allowlist, not a production one -- tighten before this ever leaves a
@@ -110,3 +118,46 @@ def reset():
     with lock:
         assistant.reset_conversation()
     return {"ok": True}
+
+
+# -- sentiment analysis ------------------------------------------------------
+# Stateless: doesn't touch `assistant` or `lock`. Not part of the
+# document-QA session -- a one-off classification of whatever text or
+# image-with-text is handed to it, unrelated to what's been uploaded.
+
+
+@app.post("/sentiment", response_model=SentimentResponse)
+def sentiment_text(request: SentimentRequest):
+    text = request.text.strip()
+    if not text:
+        raise HTTPException(400, "empty text")
+    if len(text) > MAX_SENTIMENT_CHARS:
+        raise HTTPException(400, "text too long")
+    try:
+        result = sentiment.analyze(text)
+    except Exception as exc:  # noqa: BLE001 -- surfaced as a 502, not a crash
+        raise HTTPException(502, f"sentiment analysis failed: {exc}") from exc
+    return SentimentResponse(**result)
+
+
+@app.post("/sentiment/image", response_model=SentimentResponse)
+async def sentiment_image(file: UploadFile):
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(400, "empty file")
+    if len(raw_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(400, "file too large")
+
+    try:
+        text = extract_text(file.filename, raw_bytes)
+    except UnsupportedFileType as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    if len(text) > MAX_SENTIMENT_CHARS:
+        raise HTTPException(400, "extracted text too long")
+
+    try:
+        result = sentiment.analyze(text)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"sentiment analysis failed: {exc}") from exc
+    return SentimentResponse(**result)

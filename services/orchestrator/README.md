@@ -16,6 +16,11 @@ scope gate, no verbatim-quote-only mode, no knowledge graph — see
 `app/retriever.py`'s module docstring for the scope-gate reasoning and
 `app/llm.py`'s for the model choice.
 
+Separately, classify text or an image containing text as positive,
+negative, or neutral (`POST /sentiment`, `POST /sentiment/image`) — see
+`app/sentiment.py`. Unrelated to the document-QA pipeline above: no
+uploads, no retrieval, no session state, just a one-off classification.
+
 ## What changed (and why)
 
 **The knowledge-graph approach is dropped.** Constellate started as "build
@@ -77,6 +82,17 @@ lives in `app/llm.py`'s prompt itself — an explicit instruction to treat
 retrieved context as data, never as instructions, which matters because
 context here is arbitrary uploaded document text that could contain
 injected instructions of its own.
+
+**Sentiment analysis, a second and unrelated feature.** `app/sentiment.py`
+classifies pasted text or OCR'd image text as positive/negative/neutral
+plus a short reason, using the same NVIDIA model and the same llm/stub
+two-backend pattern as the main pipeline (`backend: "llm"|"stub"` on the
+response, so it degrades to a small hardcoded-word-list heuristic rather
+than breaking when there's no API key). Also runs `check_injection()` on
+its input, same reasoning as the question in `assistant.py` — pasted
+text and OCR'd image text are exactly the kind of untrusted content
+that check exists for. Deliberately stateless: doesn't touch uploads,
+retrieval, or the shared `Assistant` instance at all.
 
 **CORS is wired for local dev.** The frontend runs on Vite's dev server
 (`localhost:5173`), a different origin than this API (`localhost:8001`),

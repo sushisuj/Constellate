@@ -39,3 +39,11 @@ Persistence
 .. todo::
    data/uploads/<id>/ layout, meta.json, reload-on-startup logic in
    Assistant.__init__.
+
+Sentiment Analysis
+---------------------
+
+.. todo::
+   sentiment.py -- separate feature, no shared state with the pipeline
+   above. Same llm/stub two-backend pattern as llm.py. Reuses extract.py
+   for OCR on image input and guardrails.check_injection() on the text.

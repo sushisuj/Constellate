@@ -28,6 +28,14 @@ Session Endpoints
 .. todo::
    POST /reset.
 
+Sentiment Endpoints
+-----------------------
+
+.. todo::
+   POST /sentiment, POST /sentiment/image -- unrelated to the
+   document-QA endpoints above, no shared state. Cover the
+   ``blocked`` label case alongside positive/negative/neutral.
+
 API Error Handling
 ----------------------
 

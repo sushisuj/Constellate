@@ -58,3 +58,25 @@ export async function clearUploads() {
   const response = await fetch(`${API_BASE}/uploads/clear`, { method: 'POST' })
   return unwrap(response)
 }
+
+// Sentiment analysis -- stateless, unrelated to the uploads/chat above.
+// Both return { label, explanation, backend, flags }.
+
+export async function analyzeSentimentText(text) {
+  const response = await fetch(`${API_BASE}/sentiment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  return unwrap(response)
+}
+
+export async function analyzeSentimentImage(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const response = await fetch(`${API_BASE}/sentiment/image`, {
+    method: 'POST',
+    body: form,
+  })
+  return unwrap(response)
+}

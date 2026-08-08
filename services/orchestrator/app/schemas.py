@@ -20,3 +20,14 @@ class UploadResponse(BaseModel):
     chunks: int
     topics: list[str]
     keywords: list[str] = Field(default_factory=list)
+
+
+class SentimentRequest(BaseModel):
+    text: str
+
+
+class SentimentResponse(BaseModel):
+    label: str  # "positive" | "negative" | "neutral" | "blocked"
+    explanation: str
+    backend: str
+    flags: list[str] = Field(default_factory=list)

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { askQuestion, clearUploads, listUploads, removeUpload, uploadFile } from './api.js'
+import {
+  analyzeSentimentImage,
+  analyzeSentimentText,
+  askQuestion,
+  clearUploads,
+  listUploads,
+  removeUpload,
+  uploadFile,
+} from './api.js'
 
 const GRAPH_W = 240
 const GRAPH_H = 220
@@ -314,6 +322,111 @@ function describeFlag(flag) {
   return null
 }
 
+const SENTIMENT_LABELS = {
+  positive: 'Positive',
+  negative: 'Negative',
+  neutral: 'Neutral',
+  blocked: 'Blocked',
+}
+
+// Separate card, separate feature -- classifying pasted text or an image's
+// text, unrelated to the uploaded-document chat above it. Keeps its own
+// state rather than sharing App's, since nothing here needs to.
+function SentimentCard() {
+  const [text, setText] = useState('')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const imageInputRef = useRef(null)
+
+  async function handleAnalyzeText(event) {
+    event.preventDefault()
+    const trimmed = text.trim()
+    if (!trimmed || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      setResult(await analyzeSentimentText(trimmed))
+    } catch (err) {
+      setError(`Analysis failed: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAnalyzeImage(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setLoading(true)
+    setError(null)
+    try {
+      setResult(await analyzeSentimentImage(file))
+    } catch (err) {
+      setError(`Analysis failed: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="sentiment-card">
+      <div className="label-row">
+        <div className="label">Sentiment Analysis</div>
+      </div>
+      <p className="sentiment-hint">
+        Paste a review or a post, or analyze an image containing text.
+      </p>
+      <form onSubmit={handleAnalyzeText}>
+        <textarea
+          className="sentiment-textarea"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Paste text to analyze…"
+          rows={4}
+          disabled={loading}
+        />
+        <div className="sentiment-actions">
+          <button type="submit" disabled={loading || !text.trim()}>
+            {loading ? 'Analyzing…' : 'Analyze text'}
+          </button>
+          <button
+            type="button"
+            className="upload-btn"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={loading}
+          >
+            Analyze an image
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            onChange={handleAnalyzeImage}
+            hidden
+          />
+        </div>
+      </form>
+
+      {error && <div className="error-banner">{error}</div>}
+
+      {result && (
+        <div className="sentiment-result">
+          <span className={`sentiment-badge ${result.label}`}>
+            {SENTIMENT_LABELS[result.label] || result.label}
+          </span>
+          <p className="sentiment-explanation">{result.explanation}</p>
+          {result.backend === 'stub' && (
+            <div className="stub-note">
+              offline stub analysis — set NVIDIA_API_KEY on the backend for real analysis
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function App() {
   const [uploads, setUploads] = useState([])
   const [messages, setMessages] = useState([])
@@ -522,6 +635,8 @@ function App() {
         </div>
         <GraphPanel words={documentWords} />
       </div>
+
+      <SentimentCard />
     </div>
   )
 }

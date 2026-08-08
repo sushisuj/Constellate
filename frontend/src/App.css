@@ -255,14 +255,14 @@ header .word {
   text-align: left;
 }
 
-.graph .label-row {
+.label-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.graph .label {
+.label {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -309,4 +309,107 @@ header .word {
 
 .node-name.active {
   fill: var(--gold);
+}
+
+.sentiment-card {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  text-align: left;
+}
+
+.sentiment-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.sentiment-textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sentiment-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.sentiment-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.sentiment-actions button[type='submit'] {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--bg);
+  background: var(--gold);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.sentiment-actions button[type='submit']:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sentiment-result {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.sentiment-badge {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+.sentiment-badge.positive {
+  color: #7fd99a;
+  border-color: rgba(127, 217, 154, 0.4);
+  background: rgba(127, 217, 154, 0.08);
+}
+
+.sentiment-badge.negative {
+  color: #e08a8a;
+  border-color: rgba(224, 138, 138, 0.4);
+  background: rgba(224, 138, 138, 0.08);
+}
+
+.sentiment-badge.neutral {
+  color: var(--text-secondary);
+  background: var(--surface-2);
+}
+
+.sentiment-badge.blocked {
+  color: var(--gold);
+  border-color: rgba(232, 184, 74, 0.4);
+  background: rgba(232, 184, 74, 0.08);
+}
+
+.sentiment-explanation {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
