@@ -331,7 +331,13 @@ class Assistant:
         # never change what's returned.
         answer, format_flags = guardrails.enforce_format(answer)
         flags = list(format_flags)
-        if guardrails.score_groundedness(answer, top_chunks) < guardrails.LOW_GROUNDEDNESS_THRESHOLD:
+        # A refusal is exempt from the groundedness check -- see
+        # guardrails.is_refusal()'s docstring -- rather than checked and
+        # nearly always flagged, since "the context doesn't cover that" is
+        # built to share almost no vocabulary with the source by design.
+        if not guardrails.is_refusal(answer) and (
+            guardrails.score_groundedness(answer, top_chunks) < guardrails.LOW_GROUNDEDNESS_THRESHOLD
+        ):
             flags.append("low_groundedness")
         flags.extend(f"unsafe_word:{w}" for w in guardrails.check_content_safety(answer))
 

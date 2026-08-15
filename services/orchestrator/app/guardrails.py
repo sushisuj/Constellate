@@ -107,6 +107,34 @@ def score_groundedness(answer, chunks):
     return hits / len(answer_words)
 
 
+# --- Output: refusal detection -------------------------------------------------
+
+# Phrasing the prompt's own "say so plainly rather than guessing" instruction
+# tends to produce when the model declines to answer (see llm.py's prompt).
+# Used to skip the groundedness check on refusals: a legitimate "the context
+# doesn't cover that" is built to share almost no vocabulary with the source
+# text -- that's the whole point of saying the source doesn't cover it -- so
+# running it through score_groundedness() and flagging it low_groundedness
+# isn't catching a bad answer, it's mislabelling a correct one as suspect.
+_REFUSAL_PATTERNS = [
+    r"(doesn't|does not) (mention|contain|cover|specify|say|include|state)",
+    r"no (mention|information) (of|about)",
+    r"(don't|do not) (have|see) (any )?information",
+    r"nothing (in|about) the (context|document)",
+    r"not (mentioned|specified|covered|stated) in the (context|document)",
+]
+_REFUSAL_RE = re.compile("|".join(_REFUSAL_PATTERNS), re.IGNORECASE)
+
+
+def is_refusal(answer):
+    """True if the answer looks like it's declining to answer rather than
+    attempting one. See score_groundedness()'s docstring above for why a
+    refusal needs to be exempted from that check rather than just scoring
+    low and getting flagged like any other answer.
+    """
+    return bool(_REFUSAL_RE.search(answer))
+
+
 # --- Output: content safety ---------------------------------------------------
 
 # Illustrative only, not a real moderation list -- deliberately mild words
