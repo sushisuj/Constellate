@@ -308,6 +308,44 @@ function GraphPanel({ words }) {
   )
 }
 
+// Bumped if the consent copy ever changes in a way that actually matters
+// (not a typo fix) -- changing the key re-prompts everyone rather than
+// silently treating an old acceptance as covering new terms.
+const CONSENT_STORAGE_KEY = 'constellate-consent-v1'
+
+// Blocks the rest of the app until dismissed -- see App's `consented`
+// state. Deliberately no click-outside-to-dismiss and no close (×)
+// button: the only way through is the accept action itself, so this is
+// an actual acknowledgement rather than something a reflexive click
+// could satisfy without reading it.
+function ConsentModal({ onAccept }) {
+  return (
+    <div className="consent-overlay" role="dialog" aria-modal="true" aria-labelledby="consent-title">
+      <div className="consent-card">
+        <ConstellationMark size={32} />
+        <h2 id="consent-title">Before you start</h2>
+        <p>
+          Constellate uses an AI model to answer questions about whatever you upload.
+          It can misread a document, cite the wrong section, or state something
+          confidently that the source text doesn't actually support — especially on
+          anything the document is ambiguous or silent about.
+        </p>
+        <ul>
+          <li>Treat every answer as a starting point, not a verified fact — check it
+            against the source document before relying on it for anything that matters.</li>
+          <li>Don't upload documents containing sensitive personal, financial, medical,
+            or legal information.</li>
+          <li>This is a personal project, not a professional or production service, and
+            comes with no guarantee of accuracy.</li>
+        </ul>
+        <button type="button" className="consent-accept" onClick={onAccept}>
+          I understand, continue
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Not every guardrail flag is worth surfacing -- stray_markdown_stripped
 // and possible_bracket_citation are silent housekeeping (see
 // guardrails.py), not something the user needs to act on. Returns null
@@ -434,8 +472,19 @@ function App() {
   const [uploading, setUploading] = useState(false)
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState(null)
+  // Read once at mount, not on every render -- localStorage.getItem is
+  // cheap but there's no reason to touch it more than necessary. See
+  // ConsentModal for why acceptance can only happen through its button.
+  const [consented, setConsented] = useState(
+    () => localStorage.getItem(CONSENT_STORAGE_KEY) === 'true',
+  )
   const fileInputRef = useRef(null)
   const chatEndRef = useRef(null)
+
+  function handleAcceptConsent() {
+    localStorage.setItem(CONSENT_STORAGE_KEY, 'true')
+    setConsented(true)
+  }
 
   // Real words from whatever's been uploaded, for GraphPanel's decorative
   // labels -- see its own comment for why real vocabulary is nicer than
@@ -528,6 +577,7 @@ function App() {
 
   return (
     <div className="wrap">
+      {!consented && <ConsentModal onAccept={handleAcceptConsent} />}
       <header>
         <ConstellationMark />
         <span className="word">Constellate</span>
@@ -539,7 +589,7 @@ function App() {
           type="button"
           className="upload-btn"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || !consented}
         >
           {uploading ? 'Uploading…' : '+ Upload document'}
         </button>
@@ -626,12 +676,15 @@ function App() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               placeholder="Ask about your documents…"
-              disabled={asking}
+              disabled={asking || !consented}
             />
-            <button type="submit" disabled={asking || !question.trim()}>
+            <button type="submit" disabled={asking || !consented || !question.trim()}>
               Ask
             </button>
           </form>
+          <p className="disclaimer">
+            Constellate can make mistakes. Verify important answers against the source document.
+          </p>
         </div>
         <GraphPanel words={documentWords} />
       </div>
