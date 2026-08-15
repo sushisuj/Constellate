@@ -112,6 +112,24 @@ class Retriever:
         hi = min(len(self._ordered_ids), pos + radius + 1)
         return [cid for cid in self._ordered_ids[lo:hi] if cid != chunk_id]
 
+    def best_match(self, text, exclude_ids=(), min_score=0.0):
+        """Search this document for the single best match to arbitrary
+        text -- not a user question, so no memory/follow-up resolution --
+        skipping anything in exclude_ids. Returns a Candidate, or None if
+        nothing is left after exclusion or the best remaining candidate
+        doesn't clear min_score.
+
+        Used to resolve an explicit in-document reference ("as described
+        above") back to the chunk it's actually pointing at: see
+        references.py and assistant.py's _expand_with_references.
+        """
+        candidates, _, _ = self.rank(text, memory=None)
+        for cand in candidates:
+            if cand.chunk.id in exclude_ids:
+                continue
+            return cand if cand.score >= min_score else None
+        return None
+
     def fetch_chunks(self, chunk_ids):
         """Look up specific chunks by id, e.g. the neighbors neighbor_ids()
         just named. Returns whatever Chroma actually has for those ids,

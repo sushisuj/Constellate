@@ -26,7 +26,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, guardrails, llm
+from . import config, guardrails, llm, references
 from .chunker import chunk_text, humanize_filename
 from .memory import Memory
 from .retriever import Retriever
@@ -213,6 +213,7 @@ class Assistant:
         top_candidates = candidates[: config.GENERATION_TOP_K]
         top_chunks = [c.chunk for c in top_candidates]
         top_chunks = self._expand_with_neighbors(top_candidates, top_chunks)
+        top_chunks = self._expand_with_references(top_candidates, top_chunks)
         answer, backend = llm.generate(question, top_chunks)
 
         # Output-side guardrails -- see guardrails.py for what each of
@@ -280,6 +281,40 @@ class Assistant:
             return top_chunks
 
         return top_chunks + retriever.fetch_chunks(neighbor_ids)
+
+    def _expand_with_references(self, top_candidates, top_chunks):
+        """Follow explicit in-document references inside the winning
+        chunk ("as defined above," "see Section 3") to the distant chunk
+        they're actually pointing at -- the gap neighbor expansion can't
+        close, since page 3 and page 40 aren't each other's neighbors.
+
+        Scoped to the winner's own text only, same reasoning as
+        _expand_with_neighbors: following references from every top
+        candidate would make prompt size unpredictable turn to turn.
+        """
+        if not top_candidates:
+            return top_chunks
+
+        winner = top_candidates[0]
+        retriever = winner.source_retriever
+        if retriever is None:
+            return top_chunks
+
+        have_ids = {c.id for c in top_chunks}
+        added = []
+        queries = references.find_reference_queries(
+            winner.chunk.text, max_queries=config.REFERENCE_MAX_QUERIES
+        )
+        for query in queries:
+            match = retriever.best_match(
+                query, exclude_ids=have_ids, min_score=config.REFERENCE_MIN_SCORE
+            )
+            if match is None:
+                continue
+            have_ids.add(match.chunk.id)
+            added.append(match.chunk)
+
+        return top_chunks + added
 
     # -- session controls ---------------------------------------------------
 

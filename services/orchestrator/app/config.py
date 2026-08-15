@@ -33,6 +33,18 @@ TOPIC_BOOST = 0.10
 RELATED_MARGIN = 0.12
 MAX_RELATED = 2
 
+# --- Long-range context (in-document back-references) ---------------------
+# Cap on how many "as described above"-style references inside the winning
+# chunk get followed per answer -- keeps prompt size bounded even if a
+# chunk contains several referring phrases.
+REFERENCE_MAX_QUERIES = 2
+# A followed reference's search score has to clear this floor to be
+# trusted. Without it, a vague reference with nothing genuinely relevant
+# in the document (e.g. "as noted above" where "above" doesn't actually
+# define anything) would still pull in whatever ranks highest overall,
+# which is noise, not a real match.
+REFERENCE_MIN_SCORE = 0.2
+
 # --- Follow-up detection --------------------------------------------------
 # A question with this many content words or fewer is treated as a
 # follow-up and blended with the previous topic before searching.
