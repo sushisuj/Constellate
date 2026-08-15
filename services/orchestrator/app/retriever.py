@@ -19,11 +19,18 @@ candidates actually good, independent of whether there's a refuse/hedge
 decision layered on top.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from . import config
 from .store import chunk_from_result
 from .textutil import content_words
+
+# Chunk ids end in a zero-padded index assigned in document order (see
+# chunker.py: "{topic}--{NNN}"), so this recovers original document order
+# by position even across a heading change, where the topic-slug prefix
+# differs from one chunk to the next but the running index doesn't.
+_CHUNK_INDEX_RE = re.compile(r"--(\d+)$")
 
 
 @dataclass
@@ -33,6 +40,11 @@ class Candidate:
     overlap: float      # share of the question's content words found in this chunk
     boost: float        # topic (in practice: same-document) continuity bonus
     score: float
+    # Which Retriever this candidate came from -- not part of its identity
+    # or its score, just plumbing so assistant.py can ask the right
+    # document's collection for this chunk's neighbors without having to
+    # re-derive which upload a chunk belongs to from its text/source label.
+    source_retriever: object = None
 
 
 @dataclass
@@ -71,6 +83,47 @@ class Retriever:
         from .store import get_collection
 
         self.collection = get_collection(chroma_dir, collection_name)
+        self._ordered_ids = self._load_ordered_ids()
+
+    def _load_ordered_ids(self):
+        """This document's chunk ids, sorted back into original document
+        order -- lets neighbor_ids() work by position instead of trying to
+        parse and compare topic-slug prefixes, which change from chunk to
+        chunk in a heading-structured document."""
+        try:
+            all_ids = self.collection.get(include=[])["ids"]
+        except Exception:
+            return []
+
+        def index_of(chunk_id):
+            match = _CHUNK_INDEX_RE.search(chunk_id)
+            return int(match.group(1)) if match else 0
+
+        return sorted(all_ids, key=index_of)
+
+    def neighbor_ids(self, chunk_id, radius=1):
+        """Ids of the `radius` chunks immediately before and after
+        chunk_id in document order. Empty if chunk_id isn't in this
+        document (e.g. it came from a different upload)."""
+        if chunk_id not in self._ordered_ids:
+            return []
+        pos = self._ordered_ids.index(chunk_id)
+        lo = max(0, pos - radius)
+        hi = min(len(self._ordered_ids), pos + radius + 1)
+        return [cid for cid in self._ordered_ids[lo:hi] if cid != chunk_id]
+
+    def fetch_chunks(self, chunk_ids):
+        """Look up specific chunks by id, e.g. the neighbors neighbor_ids()
+        just named. Returns whatever Chroma actually has for those ids,
+        in no particular order -- callers that care about order (none do
+        yet) should sort the result themselves."""
+        if not chunk_ids:
+            return []
+        raw = self.collection.get(ids=chunk_ids, include=["documents", "metadatas"])
+        return [
+            chunk_from_result(doc, meta, cid)
+            for doc, meta, cid in zip(raw["documents"], raw["metadatas"], raw["ids"])
+        ]
 
     def chunk_overlap(self, question, chunk):
         """Fraction of the question's content words that occur in this
@@ -119,7 +172,14 @@ class Retriever:
             )
             score = similarity + config.LEXICAL_WEIGHT * overlap + boost
             candidates.append(
-                Candidate(chunk=chunk, similarity=similarity, overlap=overlap, boost=boost, score=score)
+                Candidate(
+                    chunk=chunk,
+                    similarity=similarity,
+                    overlap=overlap,
+                    boost=boost,
+                    score=score,
+                    source_retriever=self,
+                )
             )
 
         candidates.sort(key=lambda c: c.score, reverse=True)

@@ -212,6 +212,7 @@ class Assistant:
 
         top_candidates = candidates[: config.GENERATION_TOP_K]
         top_chunks = [c.chunk for c in top_candidates]
+        top_chunks = self._expand_with_neighbors(top_candidates, top_chunks)
         answer, backend = llm.generate(question, top_chunks)
 
         # Output-side guardrails -- see guardrails.py for what each of
@@ -249,6 +250,36 @@ class Assistant:
             backend=backend,
             flags=flags,
         )
+
+    def _expand_with_neighbors(self, top_candidates, top_chunks):
+        """Pull in the winning chunk's immediate document-neighbors, so a
+        fact that happens to sit right at a chunk boundary isn't lost just
+        because retrieval only scored one side of it well.
+
+        Deliberately scoped to the single top-ranked candidate, not every
+        chunk in top_chunks -- expanding all of them would let the prompt
+        grow unpredictably every single question. This only handles a
+        fact split across *adjacent* chunks; a reference to something
+        defined many chunks away (e.g. a term defined on page 3, used on
+        page 40) needs the winning chunk's text to actually be followed,
+        which is a separate piece of work.
+        """
+        if not top_candidates:
+            return top_chunks
+
+        winner = top_candidates[0]
+        retriever = winner.source_retriever
+        if retriever is None:
+            return top_chunks
+
+        have_ids = {c.id for c in top_chunks}
+        neighbor_ids = [
+            cid for cid in retriever.neighbor_ids(winner.chunk.id, radius=1) if cid not in have_ids
+        ]
+        if not neighbor_ids:
+            return top_chunks
+
+        return top_chunks + retriever.fetch_chunks(neighbor_ids)
 
     # -- session controls ---------------------------------------------------
 
