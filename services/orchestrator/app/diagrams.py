@@ -81,3 +81,18 @@ def find_diagram_pages(raw_bytes):
             if is_diagram_page(page):
                 pages.append(i)
     return pages
+
+
+def render_page_png(raw_bytes, page_index, dpi=200):
+    """Render one page of this PDF to PNG bytes, for handing to a vision
+    model (see diagram_vision.py). 200 DPI: enough resolution to read a
+    diagram's box labels clearly without producing an unnecessarily large
+    image -- diagram text tends to be larger and sparser than a scanned
+    page's paragraph text, so this doesn't need OCR's 300 DPI (compare
+    extract.py's _ocr_blank_pages, which is reading dense paragraph text).
+    """
+    import fitz  # PyMuPDF; deferred: only needed once a .pdf is actually uploaded
+
+    with fitz.open(stream=raw_bytes, filetype="pdf") as doc:
+        pixmap = doc[page_index].get_pixmap(dpi=dpi)
+        return pixmap.tobytes("png")

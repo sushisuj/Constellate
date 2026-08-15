@@ -71,6 +71,15 @@ LLM_MAX_TOKENS = 2048
 # handed to the LLM as context.
 GENERATION_TOP_K = 3
 
+# --- Diagram vision extraction ---------------------------------------------
+# A plain vision-instruct model, not a reasoning one, on the same
+# NVIDIA-hosted OpenAI-compatible endpoint LLM_BASE_URL already points at
+# -- same reasoning as LLM_MODEL above: this runs once per detected
+# diagram page during upload, and a reasoning model's hidden-token
+# "thinking" step would make that the slow part of every upload.
+DIAGRAM_VISION_MODEL = "meta/llama-3.2-11b-vision-instruct"
+DIAGRAM_VISION_MAX_TOKENS = 1024
+
 # --- Storage ----------------------------------------------------------------
 # Each upload gets its own subdirectory here (a Chroma collection plus a
 # small meta.json) so documents survive a server restart. Previously these
