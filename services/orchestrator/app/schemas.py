@@ -20,6 +20,7 @@ class UploadResponse(BaseModel):
     chunks: int
     topics: list[str]
     keywords: list[str] = Field(default_factory=list)
+    diagram_count: int = 0
 
 
 class SentimentRequest(BaseModel):

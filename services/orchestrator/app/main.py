@@ -85,7 +85,7 @@ async def upload(file: UploadFile):
 
     with lock:
         try:
-            uploaded = assistant.upload_document(text, file.filename)
+            uploaded = assistant.upload_document(text, file.filename, raw_bytes=raw_bytes)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
     return UploadResponse(**uploaded)

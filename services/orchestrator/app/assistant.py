@@ -26,7 +26,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, guardrails, llm, references
+from . import config, diagram_vision, diagrams, guardrails, llm, references
 from .chunker import chunk_text, humanize_filename
 from .memory import Memory
 from .retriever import Retriever
@@ -63,18 +63,27 @@ class UploadedDoc:
     chunks: int
     topics: list
     retriever: object             # Retriever -- internal, never serialized
-    doc_dir: Path                  # holds chroma/ and meta.json; deleted on remove/clear
+    doc_dir: Path                  # holds chroma/, meta.json, diagrams.json; deleted on remove/clear
     keywords: list = field(default_factory=list)  # for the frontend's decorative labels only
+    # DiagramGraph objects extracted from this document's pages (PDFs
+    # only -- see Assistant._extract_diagrams). Kept on the object itself
+    # rather than only in diagrams.json so retrieval doesn't have to hit
+    # disk again for something already loaded into memory.
+    diagrams: list = field(default_factory=list)
 
     def summary(self):
         # Also what gets written to meta.json -- upload_document() dumps
         # this straight to disk so _load_persisted_uploads() can rebuild
-        # everything but the retriever from it on the next startup.
+        # everything but the retriever (and diagrams -- see
+        # _load_diagrams) from it on the next startup. Only a count goes
+        # here, not the full graphs -- those already have their own file
+        # (diagrams.json) so this doesn't duplicate them.
         return {
             "filename": self.filename,
             "chunks": self.chunks,
             "topics": self.topics,
             "keywords": self.keywords,
+            "diagram_count": len(self.diagrams),
         }
 
 
@@ -96,8 +105,11 @@ class Assistant:
         """Rebuild self._uploads from whatever's on disk under
         config.UPLOADS_DIR -- each subdirectory is one earlier upload's
         chroma/ collection plus the meta.json upload_document() wrote for
-        it. Only the Retriever gets reconstructed; nothing gets
-        re-chunked or re-embedded.
+        it, and diagrams.json if that upload had any. Only the Retriever
+        gets reconstructed; nothing gets re-chunked, re-embedded, or
+        re-sent to the vision model -- diagram extraction is exactly as
+        expensive as generation, so it isn't something a routine restart
+        should ever redo.
         """
         if not config.UPLOADS_DIR.exists():
             return
@@ -108,6 +120,7 @@ class Assistant:
             try:
                 meta = json.loads(meta_path.read_text())
                 retriever = Retriever(doc_dir / "chroma", "doc")
+                diagram_graphs = self._load_diagrams(doc_dir)
             except Exception:
                 # Partial/corrupt directory, e.g. the process died mid-
                 # write -- skip it rather than fail the whole service.
@@ -120,14 +133,55 @@ class Assistant:
                     retriever=retriever,
                     doc_dir=doc_dir,
                     keywords=meta.get("keywords", []),
+                    diagrams=diagram_graphs,
                 )
             )
 
-    def upload_document(self, text, filename):
+    def _load_diagrams(self, doc_dir):
+        diagrams_path = doc_dir / "diagrams.json"
+        if not diagrams_path.exists():
+            return []
+        raw = json.loads(diagrams_path.read_text())
+        return [diagram_vision.DiagramGraph.from_dict(d) for d in raw]
+
+    def _extract_diagrams(self, raw_bytes, filename):
+        """Detect and extract diagram graphs from a PDF upload's raw
+        bytes. Non-PDF uploads (markdown, docx, a plain image) have
+        nothing to scan for -- diagrams.py's page-based detection only
+        makes sense for a multi-page PDF.
+
+        Best-effort by design, same reasoning as extract.py's table
+        enrichment: a malformed PDF that trips PyMuPDF's drawing
+        inspection, or a page the vision model can't make sense of,
+        shouldn't take down the whole upload over a feature that's
+        additive on top of the text that's already been extracted.
+        """
+        if not raw_bytes or not filename.lower().endswith(".pdf"):
+            return []
+        try:
+            page_indices = diagrams.find_diagram_pages(raw_bytes)
+        except Exception:
+            return []
+
+        graphs = []
+        for page_index in page_indices:
+            try:
+                png = diagrams.render_page_png(raw_bytes, page_index)
+                graphs.append(diagram_vision.extract_diagram_graph(png, page_index))
+            except Exception:
+                continue
+        return graphs
+
+    def upload_document(self, text, filename, raw_bytes=None):
         """Index one uploaded document into its own persistent collection
         under config.UPLOADS_DIR. Added to the list of uploads rather than
         replacing any already there, so multiple documents accumulate
         across a conversation.
+
+        raw_bytes is optional and only used for diagram extraction (see
+        _extract_diagrams) -- callers that already have plain text and no
+        original file bytes (e.g. tests) can omit it and simply get no
+        diagrams, same as any non-PDF upload.
         """
         title = humanize_filename(Path(filename))
         chunks = chunk_text(text, title)
@@ -141,6 +195,8 @@ class Assistant:
         retriever = Retriever(chroma_dir, collection_name)
         topics = sorted({c.topic_label for c in chunks})
         keywords = _extract_keywords(chunks)
+        diagram_graphs = self._extract_diagrams(raw_bytes, filename)
+
         doc = UploadedDoc(
             filename=filename,
             chunks=len(chunks),
@@ -148,7 +204,12 @@ class Assistant:
             retriever=retriever,
             doc_dir=doc_dir,
             keywords=keywords,
+            diagrams=diagram_graphs,
         )
+        if diagram_graphs:
+            (doc_dir / "diagrams.json").write_text(
+                json.dumps([d.to_dict() for d in diagram_graphs])
+            )
         (doc_dir / "meta.json").write_text(json.dumps(doc.summary()))
         self._uploads.append(doc)
         return doc.summary()

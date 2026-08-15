@@ -62,6 +62,32 @@ class DiagramGraph:
                 lines.append(f"{src} leads to {dst}.")
         return " ".join(lines)
 
+    def to_dict(self):
+        """JSON-serializable form -- see assistant.py, which writes a
+        list of these to diagrams.json alongside each upload's chroma/
+        collection and meta.json, so extracted diagrams survive a
+        restart the same way the rest of an upload already does."""
+        return {
+            "page": self.page,
+            "backend": self.backend,
+            "nodes": [{"id": n.id, "label": n.label} for n in self.nodes],
+            "edges": [
+                {"source": e.source, "target": e.target, "label": e.label} for e in self.edges
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            page=data["page"],
+            backend=data.get("backend", ""),
+            nodes=[Node(id=n["id"], label=n["label"]) for n in data.get("nodes", [])],
+            edges=[
+                Edge(source=e["source"], target=e["target"], label=e.get("label", ""))
+                for e in data.get("edges", [])
+            ],
+        )
+
 
 _PROMPT = (
     "This image is a diagram or flowchart from a document. Identify every "
