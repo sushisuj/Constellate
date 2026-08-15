@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import config, diagram_vision, diagrams, guardrails, llm, references
-from .chunker import chunk_text, humanize_filename
+from .chunker import Chunk, chunk_text, humanize_filename, slugify_topic
 from .memory import Memory
 from .retriever import Retriever
 from .store import build_index
@@ -46,6 +46,47 @@ def _extract_keywords(chunks):
             if word.isalpha() and len(word) >= 4:
                 words.add(word)
     return list(words)[:MAX_KEYWORDS]
+
+
+def _diagram_chunks(diagram_graphs, title, start_index):
+    """Turn extracted diagram graphs into Chunk objects that ride the
+    same chunk/embed/retrieve pipeline as this document's text (see
+    chunker.py's Chunk) -- this is what makes a diagram's content show
+    up in ranking, neighbor expansion, and reference-following exactly
+    like any text chunk, for free, rather than needing a second parallel
+    retrieval path.
+
+    The graph's own node/edge structure isn't lost by flattening it this
+    way -- it's still sitting in doc.diagrams (see UploadedDoc), available
+    for an actual relationship query later. This is only what gets
+    embedded and searched.
+
+    start_index continues the same running id counter chunk_text() used
+    for this document's text chunks, so ids stay in the one numbering
+    scheme retriever.py's neighbor lookup already parses (chunk ids end
+    in a document-order index -- see retriever.py's _CHUNK_INDEX_RE).
+    """
+    topic = slugify_topic(title)
+    chunks = []
+    for offset, graph in enumerate(diagram_graphs):
+        text = graph.to_text()
+        if not text:
+            # A vision extraction that ran but found nothing legible
+            # (backend="vision", zero nodes) -- nothing worth indexing,
+            # as opposed to the offline stub, which always has at least
+            # its one honestly-labelled placeholder node.
+            continue
+        chunks.append(
+            Chunk(
+                id=f"{topic}--{start_index + offset:03d}",
+                text=text,
+                topic=topic,
+                topic_label=title,
+                section=f"Diagram (page {graph.page + 1})",
+                source=title,
+            )
+        )
+    return chunks
 
 
 @dataclass
@@ -184,22 +225,28 @@ class Assistant:
         diagrams, same as any non-PDF upload.
         """
         title = humanize_filename(Path(filename))
-        chunks = chunk_text(text, title)
+        text_chunks = chunk_text(text, title)
+        diagram_graphs = self._extract_diagrams(raw_bytes, filename)
+        diagram_chunks = _diagram_chunks(diagram_graphs, title, start_index=len(text_chunks))
+        # Diagram chunks ride the exact same collection as this
+        # document's text -- see _diagram_chunks' own docstring for why
+        # that's what makes them retrievable, neighbor-expandable, and
+        # reference-followable for free.
+        all_chunks = text_chunks + diagram_chunks
 
         doc_dir = config.UPLOADS_DIR / uuid.uuid4().hex[:12]
         doc_dir.mkdir(parents=True, exist_ok=True)
         chroma_dir = doc_dir / "chroma"
         collection_name = "doc"
-        build_index(chunks, chroma_dir, collection_name, source_label=title)
+        build_index(all_chunks, chroma_dir, collection_name, source_label=title)
 
         retriever = Retriever(chroma_dir, collection_name)
-        topics = sorted({c.topic_label for c in chunks})
-        keywords = _extract_keywords(chunks)
-        diagram_graphs = self._extract_diagrams(raw_bytes, filename)
+        topics = sorted({c.topic_label for c in all_chunks})
+        keywords = _extract_keywords(all_chunks)
 
         doc = UploadedDoc(
             filename=filename,
-            chunks=len(chunks),
+            chunks=len(all_chunks),
             topics=topics,
             retriever=retriever,
             doc_dir=doc_dir,
