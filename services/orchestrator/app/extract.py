@@ -14,9 +14,40 @@ split into chunks.
 """
 
 import io
+import os
+import shutil
 
 SUPPORTED_EXTENSIONS = {".md", ".markdown", ".txt", ".pdf", ".docx", ".jpg", ".jpeg", ".png", ".webp"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+
+# The two standard install locations for the Windows Tesseract build
+# (github.com/UB-Mannheim/tesseract). The installer doesn't add itself to
+# PATH by default, so relying on PATH alone means OCR silently breaks on
+# every fresh machine until someone edits PATH by hand and restarts their
+# terminal. Checking these paths directly means it works right after
+# installing, no PATH edit required.
+_WINDOWS_TESSERACT_CANDIDATES = [
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+]
+
+
+def _configure_tesseract():
+    """Point pytesseract at the tesseract binary directly if it isn't
+    already resolvable on PATH. Safe to call repeatedly -- a no-op once
+    it's found something."""
+    import pytesseract
+
+    if shutil.which("tesseract"):
+        return
+    if pytesseract.pytesseract.tesseract_cmd not in (None, "tesseract") and os.path.exists(
+        pytesseract.pytesseract.tesseract_cmd
+    ):
+        return  # already configured (e.g. by a previous call)
+    for candidate in _WINDOWS_TESSERACT_CANDIDATES:
+        if os.path.exists(candidate):
+            pytesseract.pytesseract.tesseract_cmd = candidate
+            return
 
 
 class UnsupportedFileType(Exception):
@@ -135,6 +166,7 @@ def _ocr_blank_pages(raw_bytes, pages):
     import pytesseract
     from PIL import Image
 
+    _configure_tesseract()
     try:
         with fitz.open(stream=raw_bytes, filetype="pdf") as doc:
             for i in blank_indices:
@@ -167,6 +199,7 @@ def _extract_image(raw_bytes):
     import pytesseract  # deferred: only needed once an image is actually uploaded
     from PIL import Image
 
+    _configure_tesseract()
     image = Image.open(io.BytesIO(raw_bytes))
     text = pytesseract.image_to_string(image).strip()
     if not text:
