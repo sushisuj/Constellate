@@ -41,19 +41,32 @@ model `meta/llama-3.1-8b-instruct` — see
 
 ## Status
 
-`services/orchestrator` is implemented and verified as far as this
-environment allows (see its own README's Status section) — not yet
-confirmed against the real NVIDIA/Chroma endpoints on an actual machine.
-`frontend` now calls it directly (upload, remove, clear, ask, list
-uploads) — the JS builds cleanly and the API calls were traced by hand
-against the backend's routes, but the two haven't been run against each
-other on a real machine yet either. That's the next thing to confirm.
+Confirmed end-to-end on a real machine, not just traced by hand: upload
+(including OCR via Tesseract — a separate binary from the Python
+dependencies, see `services/orchestrator/README.md`'s "Running locally"),
+chunking, embedding, retrieval, and LLM-composed answers all verified
+working together against the real NVIDIA and Chroma endpoints.
+`frontend` calls the orchestrator directly for every action (upload,
+remove, clear, ask, list uploads), and both pieces have been run against
+each other live.
 
-Uploads now persist across a backend restart (`data/uploads/`, gitignored
-— see `services/orchestrator/README.md`'s "What changed" section). The
-reload-on-restart path was verified with a stubbed-out Chroma so the file
-logic itself is exercised end to end, but not yet with the real
-dependency stack on an actual machine.
+Guardrails (`app/guardrails.py`) are live and have already caught a real
+issue in practice, not just in tests: a hallucinated answer combining a
+real document term with an invented one, which the prompt and
+groundedness checks have since been tightened against — see
+`services/orchestrator/README.md`'s "What changed" section.
+
+Uploads persist across a backend restart (`data/uploads/`, gitignored —
+see `services/orchestrator/README.md`'s "What changed" section), verified
+with the real dependency stack, not just the stubbed-out Chroma used
+during earlier development.
+
+What's not yet in place: automated regression tests at the HTTP route
+layer (`/upload`, `/ask`, etc. are currently only checked by hand, not by
+a `TestClient` suite — everything below that layer has good coverage, see
+`services/orchestrator/tests/`), and diagram-to-graph extraction only
+runs for PDFs — a standalone image upload only ever gets flat OCR, no
+structural understanding of what connects to what.
 
 ## Running locally
 

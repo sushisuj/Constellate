@@ -102,36 +102,50 @@ contact with a real deployment.
 
 ## Status
 
-Implemented and verified as far as this environment allows: every module
-imports cleanly, `/health`, `/ask` with no uploads (correct refusal
-message), empty-question 400, and `/uploads` all behave correctly against
-a live FastAPI `TestClient`. `/upload` was traced all the way through
-text extraction → chunking → Chroma collection creation → the embedding
-model's download call, which is where it hit this sandbox's network
-policy (same wall `services/ingestion` hit before it was confirmed working
-against the real NVIDIA/Chroma endpoints on an actual machine). Not yet
-confirmed end-to-end for real — that's the next thing to do.
+Confirmed end-to-end on a real machine (Windows), not just this
+development sandbox: `/upload` runs all the way through text extraction
+(including OCR via Tesseract — a separate binary install, not just a pip
+package, see "Running locally" below), chunking, Chroma collection
+creation, and the embedding model's actual download and use, against the
+real NVIDIA and Chroma endpoints. `/ask` returns real LLM-composed
+answers, not just the offline stub.
+
+This sandbox's own testing, below, is what got verified first, before
+that real-machine confirmation — kept here since it's still accurate and
+still the fastest way to check core logic without the full dependency
+stack. Every module imports cleanly; `/health`, `/ask` with no uploads
+(correct refusal message), empty-question 400, and `/uploads` all behave
+correctly against a live FastAPI `TestClient`, run in this sandbox. There
+is currently no permanent regression test file for the HTTP route layer
+itself (no `test_main.py` yet) — those checks were run by hand, not
+captured as a suite anyone can rerun.
 
 The persistence path (upload → restart → reload, plus remove/clear
-deleting their directories) was verified separately, against a stubbed-out
-Chroma standing in for the real one — this sandbox couldn't get the real
-`chromadb` package's full dependency chain (it pulls in OpenTelemetry's
-gRPC exporter, which needs a C extension this environment couldn't build)
-installed to test it directly. The file-handling logic itself — writing
-and reading `meta.json`, reconstructing `UploadedDoc`s, deleting
-directories on remove/clear — is exercised end to end by that test; what's
-still unconfirmed is that exact same logic running against the real
-Chroma on an actual machine.
+deleting their directories) was verified in this sandbox against a
+stubbed-out Chroma standing in for the real one (this sandbox couldn't
+get the real `chromadb` package's full dependency chain installed — it
+pulls in OpenTelemetry's gRPC exporter, which needs a C extension this
+environment couldn't build), and has since been confirmed against the
+real Chroma on an actual machine too.
 
-Guardrails were checked directly against `guardrails.py`'s functions
-(injection patterns against both attack phrasings and legitimate
-questions that share surface words with them, like "act as a lawyer and
-explain this clause" correctly *not* blocking; groundedness scoring
-against a grounded vs. an unrelated answer; format stripping against a
-markdown-heavy sample) and through `Assistant.ask()` end to end against
-the same stubbed-Chroma setup used for the persistence check. All passed,
-including confirming a blocked question never reaches retrieval or
-generation.
+Guardrails (`app/guardrails.py`) were checked directly against their own
+functions (injection patterns against both attack phrasings and
+legitimate questions that share surface words with them, like "act as a
+lawyer and explain this clause" correctly *not* blocking; groundedness
+scoring; format stripping; refusal detection — see
+`tests/test_guardrails.py`) and through `Assistant.ask()` end to end
+against the stubbed-Chroma setup. They've also now caught a real issue in
+live use, not just in tests: a hallucinated answer combining a real
+document term with an invented one scored high enough on lexical overlap
+to slip past the groundedness check. Fixed with a tightened prompt
+(`app/llm.py`) plus a new `is_refusal()` check, so a legitimate refusal
+doesn't get mislabeled `low_groundedness` just for sharing little
+vocabulary with the source it's declining to answer from.
+
+Known gaps: no automated tests at the HTTP route layer (everything below
+`main.py` has good coverage — see `tests/`); diagram-to-graph extraction
+only runs for PDF uploads, a standalone image only ever gets flat OCR
+with no structural understanding of what connects to what.
 
 ## Running locally
 
