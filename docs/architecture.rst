@@ -7,8 +7,22 @@ Architecture
 Architecture Diagram
 ---------------------
 
-.. todo::
-   Embed the diagram once it exists (Miro export or similar).
+.. figure:: /_static/architecture.png
+   :alt: Constellate component diagram -- client panels and services,
+         server routes and internal services, persistence, and the two
+         external NVIDIA-hosted dependencies, with every real call
+         between them drawn as an arrow.
+   :width: 100%
+
+   Every arrow here is a real call verified against the source, not a
+   sketch -- traced flow by flow: upload, ask, the four admin routes
+   (list/remove/clear/reset), and sentiment, which deliberately bypasses
+   Orchestration Service entirely rather than being routed through it
+   like everything else. Two boxes are correctly disconnected on
+   purpose: Health Route (a liveness check the frontend doesn't call
+   today) and Constellation Panel (decorative -- it renders vocabulary
+   already fetched by Upload Service/Uploads List Service for other
+   reasons, rather than calling anything itself).
 
 Frontend Layer
 ---------------
